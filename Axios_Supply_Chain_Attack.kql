@@ -1,0 +1,15 @@
+let C2_IP = "142.11.206.73";
+let C2_Domain = "sfrclak.com";
+let MaliciousHashes = dynamic(["2553649f232204966871cea80a5d0d6adc700ca", "d6f3f62fd3b9f5432f5782b62d8cfd5247d5ee71", "07d889e2dadce6f3910dcbc253317d28ca61c766"]);
+let MaliciousFiles = dynamic(["/Library/Caches/com.apple.act.mond", @"C:\ProgramData\wt.exe", "/tmp/ld.py"]);
+let TempFiles = dynamic(["6202033.vbs", "6202033.ps1"]);
+let NetworkHunt = DeviceNetworkEvents
+    | where RemoteIP == C2_IP or RemoteUrl contains C2_Domain
+    | project Timestamp, DeviceName, ActionType="NetworkConnection", Target=RemoteUrl, Process=InitiatingProcessCommandLine;
+let FileHunt = DeviceFileEvents
+    | where SHA1 in (MaliciousHashes) 
+       or FolderPath has_any (MaliciousFiles) 
+       or (FolderPath contains @"\AppData\Local\Temp\" and FileName in~ (TempFiles))
+    | project Timestamp, DeviceName, ActionType, Target=FolderPath, Process=InitiatingProcessCommandLine;
+union isfuzzy=true NetworkHunt, FileHunt
+| sort by Timestamp desc
